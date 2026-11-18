@@ -3,6 +3,7 @@
 A Next.js research discovery application backed by MySQL and Qdrant. Explore the paper, author, topic, method, and citation network through keyword search, paper detail pages, live collection insights, and semantic search.
 
 For the complete Windows PowerShell setup, database, vector-search, and run commands, see [RUN_COMMANDS.md](RUN_COMMANDS.md).
+For the interactive SQL and vector-search demonstration walkthrough, see [DATABASE_DEMO_GUIDE.md](DATABASE_DEMO_GUIDE.md).
 
 ## Run locally
 
