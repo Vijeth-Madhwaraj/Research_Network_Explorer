@@ -12,7 +12,7 @@ export default async function DatabaseDemoPage() {
 
   return (
     <main className="admin-page min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-8">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-7xl">
         <div className="mb-8">
           <Link href="/admin" className="text-sm font-medium text-blue-700 hover:underline">← Back to Admin Dashboard</Link>
           <p className="admin-eyebrow mt-5">DBMS LEVEL 3 · INTERACTIVE WALKTHROUGH</p>

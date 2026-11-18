@@ -71,7 +71,7 @@ export default function DatabaseDemoPanel() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(290px,.78fr)]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
       <section className="space-y-4">
         <div className="rounded border border-slate-200 bg-white p-5">
           <label htmlFor="demo-paper-id" className="block text-sm font-semibold text-slate-800">Paper ID for procedure and paper-network demos</label>
@@ -92,15 +92,15 @@ export default function DatabaseDemoPanel() {
         </div>
       </section>
 
-      <aside className="min-w-0 rounded border border-slate-200 bg-white p-5" aria-live="polite">
+      <aside className="min-w-0 rounded border border-slate-200 bg-white p-5 lg:sticky lg:top-4 lg:flex lg:h-[calc(100vh-2rem)] lg:min-h-[560px] lg:flex-col" aria-live="polite">
         <p className="text-[10px] font-bold tracking-[.14em] text-slate-500">LIVE RESULT</p>
         {!output ? (
           <div className="mt-5 text-sm leading-6 text-slate-500">Choose a feature to run it against the connected MySQL database. Results and the example SQL will appear here.</div>
         ) : (
           <>
             <h2 className="mt-3 text-lg font-semibold text-slate-900">{output.title}</h2>
-            {output.sql && <pre className="mt-4 overflow-x-auto rounded bg-slate-950 p-3 text-[11px] leading-5 text-emerald-100"><code>{output.sql}</code></pre>}
-            {output.error ? <p className="mt-4 rounded bg-red-50 p-3 text-sm leading-6 text-red-800">{output.error}</p> : <pre className="mt-4 max-h-[520px] overflow-auto rounded bg-slate-50 p-3 text-[11px] leading-5 text-slate-700"><code>{JSON.stringify(output.result, null, 2)}</code></pre>}
+            {output.sql && <pre className="mt-4 max-h-48 shrink-0 overflow-auto rounded bg-slate-950 p-3 text-[11px] leading-5 text-emerald-100"><code>{output.sql}</code></pre>}
+            {output.error ? <p className="mt-4 rounded bg-red-50 p-3 text-sm leading-6 text-red-800">{output.error}</p> : <pre className="mt-4 min-h-0 flex-1 overflow-auto rounded bg-slate-50 p-3 text-[11px] leading-5 text-slate-700"><code>{JSON.stringify(output.result, null, 2)}</code></pre>}
           </>
         )}
         <p className="mt-5 border-t border-slate-100 pt-4 text-xs leading-5 text-slate-500">Procedure access may require an <code>EXECUTE</code> grant for the app’s MySQL account. Demo update actions use a transaction and do not leave paper or audit changes behind.</p>
