@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
+import type { ResultSetHeader } from "mysql2/promise";
 import pool from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 
@@ -27,13 +28,19 @@ const viewQueries = {
 } as const;
 
 type ViewAction = keyof typeof viewQueries;
-type DemoAction = ViewAction | "procedure" | "trigger" | "transaction" | "index";
+type DemoAction = ViewAction | "ddl" | "dml" | "join" | "correlated" | "recursive" | "aggregate" | "procedure" | "trigger" | "transaction" | "index";
 type DemoRow = RowDataPacket & Record<string, unknown>;
 
 function isDemoAction(value: unknown): value is DemoAction {
   return typeof value === "string" && (
     Object.prototype.hasOwnProperty.call(viewQueries, value) ||
     value === "procedure" ||
+    value === "ddl" ||
+    value === "dml" ||
+    value === "join" ||
+    value === "correlated" ||
+    value === "recursive" ||
+    value === "aggregate" ||
     value === "trigger" ||
     value === "transaction" ||
     value === "index"
@@ -71,7 +78,7 @@ export async function POST(request: Request) {
   }
 
   const action = requestBody.action;
-  const needsPaper = action === "procedure" || action === "trigger" || action === "transaction";
+  const needsPaper = action === "procedure" || action === "trigger" || action === "transaction" || action === "recursive";
   const paperId = needsPaper ? validPaperId(requestBody.paperId) : null;
   if (needsPaper && paperId === null) {
     return NextResponse.json({ error: "Enter a valid paper ID." }, { status: 400 });
@@ -89,13 +96,165 @@ export async function POST(request: Request) {
       });
     }
 
+    if (action === "ddl") {
+      const [paperRows] = await pool.query<DemoRow[]>("SHOW CREATE TABLE paper");
+      const [relationshipRows] = await pool.query<DemoRow[]>("SHOW CREATE TABLE paper_author");
+      return NextResponse.json({
+        success: true,
+        title: "DDL · table definitions and constraints",
+        sql: "SHOW CREATE TABLE paper;\nSHOW CREATE TABLE paper_author;",
+        result: { paper: paperRows[0], paper_author: relationshipRows[0] },
+      });
+    }
+
+    if (action === "dml") {
+      const connection = await pool.getConnection();
+      let transactionOpen = false;
+      try {
+        const [engineRows] = await connection.execute<DemoRow[]>(
+          `SELECT ENGINE AS engine FROM information_schema.tables
+           WHERE table_schema = DATABASE() AND table_name = 'paper'`
+        );
+        if (String(engineRows[0]?.engine).toLowerCase() !== "innodb") {
+          return NextResponse.json({
+            error: "The DML demonstration requires the paper table to use InnoDB so its changes can be rolled back safely.",
+          }, { status: 409 });
+        }
+
+        await connection.beginTransaction();
+        transactionOpen = true;
+        const [insertResult] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO paper (title, abstract, publication_year, venue, doi, source_url)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          ["DBMS SQL demo record", "Temporary record for the interactive DML demonstration.", 2020, "DBMS Demo", null, null]
+        );
+        const demoPaperId = insertResult.insertId;
+        const [insertRows] = await connection.execute<DemoRow[]>(
+          "SELECT paper_id, title FROM paper WHERE paper_id = ?",
+          [demoPaperId]
+        );
+
+        await connection.execute(
+          "UPDATE paper SET title = ? WHERE paper_id = ?",
+          ["DBMS SQL demo record · updated", demoPaperId]
+        );
+        const [updateRows] = await connection.execute<DemoRow[]>(
+          "SELECT paper_id, title FROM paper WHERE paper_id = ?",
+          [demoPaperId]
+        );
+
+        const [deleteResult] = await connection.execute<ResultSetHeader>(
+          "DELETE FROM paper WHERE paper_id = ?",
+          [demoPaperId]
+        );
+        const [deleteRows] = await connection.execute<DemoRow[]>(
+          "SELECT paper_id, title FROM paper WHERE paper_id = ?",
+          [demoPaperId]
+        );
+
+        await connection.rollback();
+        transactionOpen = false;
+        const [finalRows] = await connection.execute<DemoRow[]>(
+          "SELECT paper_id, title FROM paper WHERE paper_id = ?",
+          [demoPaperId]
+        );
+
+        return NextResponse.json({
+          success: true,
+          title: "INSERT · UPDATE · DELETE · rollback",
+          sql: `START TRANSACTION;\nINSERT INTO paper (title, abstract, publication_year, venue, doi, source_url)\nVALUES ('DBMS SQL demo record', 'Temporary record for the interactive DML demonstration.', 2020, 'DBMS Demo', NULL, NULL);\nSELECT paper_id, title FROM paper WHERE paper_id = ${demoPaperId};\nUPDATE paper SET title = 'DBMS SQL demo record · updated' WHERE paper_id = ${demoPaperId};\nSELECT paper_id, title FROM paper WHERE paper_id = ${demoPaperId};\nDELETE FROM paper WHERE paper_id = ${demoPaperId};\nSELECT paper_id, title FROM paper WHERE paper_id = ${demoPaperId};\nROLLBACK;`,
+          result: {
+            afterInsert: insertRows[0],
+            afterUpdate: updateRows[0],
+            deleteAffectedRows: deleteResult.affectedRows,
+            afterDelete: deleteRows[0] ?? null,
+            afterRollback: finalRows[0] ?? null,
+            note: "The temporary row was inserted, updated, and deleted inside a transaction. The final rollback removed the demo row and its audit event.",
+          },
+        });
+      } catch (error) {
+        if (transactionOpen) await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    }
+
+    if (action === "join") {
+      const sql = `SELECT p.paper_id, p.title, a.name AS author_name, pa.author_order
+FROM paper p
+JOIN paper_author pa ON pa.paper_id = p.paper_id
+JOIN author a ON a.author_id = pa.author_id
+ORDER BY p.paper_id DESC, pa.author_order
+LIMIT 10`;
+      const [rows] = await pool.execute<DemoRow[]>(sql);
+      return NextResponse.json({ success: true, title: "JOIN · papers and authors", sql, result: rows });
+    }
+
+    if (action === "correlated") {
+      const sql = `SELECT p.paper_id, p.title,
+       (SELECT COUNT(*) FROM citation c WHERE c.cited_paper_id = p.paper_id) AS incoming_citations
+FROM paper p
+WHERE (SELECT COUNT(*) FROM citation c WHERE c.cited_paper_id = p.paper_id) > 0
+ORDER BY incoming_citations DESC, p.paper_id
+LIMIT 10`;
+      const [rows] = await pool.execute<DemoRow[]>(sql);
+      return NextResponse.json({ success: true, title: "Correlated subquery · citation counts", sql, result: rows });
+    }
+
+    if (action === "recursive") {
+      const sql = `WITH RECURSIVE citation_walk AS (
+  SELECT c.citing_paper_id AS root_paper_id,
+         c.cited_paper_id AS paper_id,
+         1 AS depth,
+         CAST(CONCAT(',', c.citing_paper_id, ',', c.cited_paper_id, ',') AS CHAR(2000)) AS visited
+  FROM citation c
+  WHERE c.citing_paper_id = ?
+  UNION ALL
+  SELECT cw.root_paper_id,
+         c.cited_paper_id,
+         cw.depth + 1,
+         CONCAT(cw.visited, c.cited_paper_id, ',')
+  FROM citation_walk cw
+  JOIN citation c ON c.citing_paper_id = cw.paper_id
+  WHERE cw.depth < 3
+    AND LOCATE(CONCAT(',', c.cited_paper_id, ','), cw.visited) = 0
+)
+SELECT cw.depth, p.paper_id, p.title, p.publication_year
+FROM citation_walk cw
+JOIN paper p ON p.paper_id = cw.paper_id
+ORDER BY cw.depth, p.publication_year DESC, p.paper_id
+LIMIT 25`;
+      const [rows] = await pool.execute<DemoRow[]>(sql, [paperId]);
+      return NextResponse.json({
+        success: true,
+        title: "Recursive CTE · citation network up to 3 hops",
+        sql: sql.replace("?", String(paperId)),
+        result: rows,
+      });
+    }
+
+    if (action === "aggregate") {
+      const sql = `SELECT venue, COUNT(*) AS paper_count,
+       MIN(publication_year) AS first_year,
+       MAX(publication_year) AS latest_year
+FROM paper
+WHERE venue IS NOT NULL AND TRIM(venue) <> ''
+GROUP BY venue
+HAVING COUNT(*) >= 3
+ORDER BY paper_count DESC, venue
+LIMIT 10`;
+      const [rows] = await pool.execute<DemoRow[]>(sql);
+      return NextResponse.json({ success: true, title: "GROUP BY · HAVING · aggregates · ORDER BY", sql, result: rows });
+    }
+
     if (action === "procedure") {
       const sql = "CALL GetPaperDetails(?)";
       const [rows] = await pool.query(sql, [paperId]);
       return NextResponse.json({
         success: true,
         title: "GetPaperDetails",
-        sql: "CALL GetPaperDetails(?)  -- paper ID: " + paperId,
+        sql: `CALL GetPaperDetails(${paperId});`,
         result: JSON.parse(JSON.stringify(rows)),
       });
     }
@@ -116,6 +275,21 @@ export async function POST(request: Request) {
       const connection = await pool.getConnection();
       let transactionOpen = false;
       try {
+        const requiredTables = action === "trigger" ? ["paper", "paper_audit"] : ["paper"];
+        const [engineRows] = await connection.execute<DemoRow[]>(
+          `SELECT table_name, ENGINE AS engine FROM information_schema.tables
+           WHERE table_schema = DATABASE() AND table_name IN (${requiredTables.map(() => "?").join(", ")})`,
+          requiredTables
+        );
+        const transactionalTables = new Set(
+          engineRows.filter((row) => String(row.engine).toLowerCase() === "innodb").map((row) => String(row.table_name))
+        );
+        if (requiredTables.some((table) => !transactionalTables.has(table))) {
+          return NextResponse.json({
+            error: "This rollback-safe demonstration requires its participating tables to use InnoDB.",
+          }, { status: 409 });
+        }
+
         await connection.beginTransaction();
         transactionOpen = true;
 
@@ -169,8 +343,8 @@ export async function POST(request: Request) {
           success: true,
           title: action === "trigger" ? "Title update trigger · rolled back safely" : "Transaction rollback · rolled back safely",
           sql: action === "trigger"
-            ? "START TRANSACTION; UPDATE paper ...; SELECT * FROM paper_audit ...; ROLLBACK;"
-            : "START TRANSACTION; UPDATE paper ...; SELECT title ...; ROLLBACK; SELECT title ...;",
+            ? `START TRANSACTION;\nUPDATE paper SET title = CONCAT('DBMS demo ', UUID(), ': ', LEFT(title, 950)) WHERE paper_id = ${paperId};\nSELECT audit_id, old_title, new_title, action_type FROM paper_audit WHERE paper_id = ${paperId} ORDER BY audit_id DESC LIMIT 1;\nROLLBACK;`
+            : `START TRANSACTION;\nUPDATE paper SET title = CONCAT('DBMS demo ', UUID(), ': ', LEFT(title, 950)) WHERE paper_id = ${paperId};\nSELECT paper_id, title FROM paper WHERE paper_id = ${paperId};\nROLLBACK;\nSELECT paper_id, title FROM paper WHERE paper_id = ${paperId};`,
           result: {
             before: beforeRows[0],
             duringTransaction: duringRows[0],

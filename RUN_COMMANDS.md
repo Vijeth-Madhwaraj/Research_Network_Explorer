@@ -76,7 +76,7 @@ To let the app account call the tutorial procedure, run this once as a MySQL adm
 GRANT EXECUTE ON PROCEDURE research_network_explorer.GetPaperDetails TO 'research_app'@'localhost';
 ```
 
-The Admin Dashboard's **Database Feature Lab** runs the existing tutorial views, procedure, audit trigger, index plan, and safe rollback examples. The paper-update demos roll back their changes automatically.
+The Admin Dashboard's **Database Feature Lab** inspects table DDL and constraints; runs rollback-safe INSERT, UPDATE, and DELETE examples; demonstrates joins, correlated subqueries, a recursive CTE, grouping, views, the procedure, the audit trigger, and the index plan; and shows the SQL with live results. The DML and paper-update demos roll back their changes automatically.
 
 ## 4. Create vectors and start Qdrant
 
