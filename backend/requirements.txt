@@ -1,0 +1,6 @@
+fastapi
+mysql-connector-python
+qdrant-client
+requests
+sentence-transformers
+uvicorn[standard]
