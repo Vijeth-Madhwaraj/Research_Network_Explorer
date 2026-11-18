@@ -55,7 +55,12 @@ export default async function AdminPage() {
               (Admin)
             </p>
           </div>
-          <LogoutButton />
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href="/admin/database-demo" className="rounded border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+              Database Feature Lab
+            </Link>
+            <LogoutButton />
+          </div>
         </div>
 
         {/* Stats */}

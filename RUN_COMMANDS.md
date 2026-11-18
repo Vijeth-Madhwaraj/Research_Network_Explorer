@@ -62,6 +62,22 @@ mysql -u root -p research_network_explorer -e "source database/advanced_features
 
 The SQL file creates named indexes and triggers, so do not rerun it unless you first check/remove the existing objects.
 
+Install the five tutorial views, `GetPaperDetails`, and title-audit trigger used by the Database Feature Lab:
+
+```powershell
+mysql -u root -p research_network_explorer -e "source database/tutorial_objects.sql"
+```
+
+This script replaces those named views, procedure, and trigger. It preserves rows already in `paper_audit`.
+
+To let the app account call the tutorial procedure, run this once as a MySQL administrator. Adjust the account host if your app's MySQL user uses a different host:
+
+```sql
+GRANT EXECUTE ON PROCEDURE research_network_explorer.GetPaperDetails TO 'research_app'@'localhost';
+```
+
+The Admin Dashboard's **Database Feature Lab** runs the existing tutorial views, procedure, audit trigger, index plan, and safe rollback examples. The paper-update demos roll back their changes automatically.
+
 ## 4. Create vectors and start Qdrant
 
 Generate normalized title/abstract embeddings and store them in MySQL:

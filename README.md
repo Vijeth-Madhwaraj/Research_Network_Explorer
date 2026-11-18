@@ -20,6 +20,8 @@ For the complete Windows PowerShell setup, database, vector-search, and run comm
 
 The first administrator account must be seeded directly in the `user` table with a bcrypt password hash. Admins can then create accounts from the Admin Dashboard. Do not expose a public admin-registration route.
 
+Run [`database/tutorial_objects.sql`](database/tutorial_objects.sql) to install the five tutorial views, `GetPaperDetails` procedure, audit table, and title-update trigger. Admins can then open **Admin Dashboard → Database Feature Lab** to run those features, inspect the publication-year index plan, and try rollback-safe transaction examples against MySQL.
+
 ## Database operations shown in the app
 
 - **SELECT:** recent papers, paper detail, role lookups, live metrics, and search results.
