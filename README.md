@@ -4,6 +4,7 @@ A Next.js research discovery application backed by MySQL and Qdrant. Explore the
 
 For the complete Windows PowerShell setup, database, vector-search, and run commands, see [RUN_COMMANDS.md](RUN_COMMANDS.md).
 For the interactive SQL and vector-search demonstration walkthrough, see [DATABASE_DEMO_GUIDE.md](DATABASE_DEMO_GUIDE.md).
+For viva explanations and sample answers, see [VIVA_PREPARATION_GUIDE.md](VIVA_PREPARATION_GUIDE.md).
 
 ## Run locally
 
